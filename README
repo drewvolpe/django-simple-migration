@@ -1,11 +1,17 @@
 
 
-This allows you to migrate your django schema using .sql or .py
-files in a /db directory.  1.sql will correspond to schema version
-1.  2.sql will migrate to version 2, etc.
+django-simple-migration is a very simple schema migrator for 
+Django.  Yes, there are a few existing migration options.  Most
+attempt to write SQL for you and, imho, do too much.
 
+I wanted something that let me write a SQL or Python file for each
+upgrade and then would run them as needed, keeping track of what
+version it was currently on.  So I wrote it.  This does exactly that
+and nothing else.
 
-It's still very much a work in progress.
+It's still very much a work in progress, but is functional and
+actively used for at least two sites.
+
 
 
 To set it up:

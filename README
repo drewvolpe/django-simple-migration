@@ -1,0 +1,31 @@
+
+
+This allows you to migrate your django schema using .sql or .py
+files in a /db directory.  1.sql will correspond to schema version
+1.  2.sql will migrate to version 2, etc.
+
+
+It's still very much a work in progress.
+
+
+To set it up:
+
+-Copy "management" into a django application directory (any application in
+your project).
+
+-Add a "db" directory
+
+-create a "schema_version" table:
+
+ CREATE TABLE "schema_version" (
+   "id" serial NOT NULL PRIMARY KEY,
+    "upgrade_timestamp" timestamp with time zone,
+    "new_version" varchar(20) NOT NULL,
+    "comment" varchar(200) NULL
+ )
+
+-create a 1.sql with your first migration in it.
+
+-run "python manage.py upgrade -n 1 -e" to perform the upgrade.
+
+ 

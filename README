@@ -1,37 +1,35 @@
 
 
 django-simple-migration is a very simple schema migrator for 
-Django.  Yes, there are a few existing migration options.  Most
-attempt to write SQL for you and, imho, do too much.
-
+Django.  Yes, there are a few different existing migration libraries.
 I wanted something that let me write a SQL or Python file for each
 upgrade and then would run them as needed, keeping track of what
 version it was currently on.  So I wrote it.  This does exactly that
 and nothing else.
 
 It's still very much a work in progress, but is functional and
-actively used for at least two sites.
+actively used for at least two production sites.
 
 
+To install:
 
-To set it up:
+-copy the "management" folder into your django project.
 
--Copy "management" into a django application directory (any application in
-your project).
-
--Add a "db" directory
-
--create a "schema_version" table:
-
- CREATE TABLE "schema_version" (
-   "id" serial NOT NULL PRIMARY KEY,
-    "upgrade_timestamp" timestamp with time zone,
-    "new_version" varchar(20) NOT NULL,
-    "comment" varchar(200) NULL
- )
+-add 'project.migration' to the INSTALLED_APPS in your settings.py
 
 -create a 1.sql with your first migration in it.
+ (there's an example one in there which creates a new table)
 
 -run "python manage.py upgrade -n 1 -e" to perform the upgrade.
 
- 
+
+That's it.  For future migrations, create 2.sql, 3.sql, etc.
+You can also have migrations which are python files; simply
+create 2.py, 3.py, etc.
+
+
+If you want to use the admin app to view the migrations that
+have been run on your project, uncomment the admin.py and
+replace PROJECT_NAME with your project's name.
+
+

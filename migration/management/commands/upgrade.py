@@ -9,24 +9,16 @@ import string
 import sys
 import traceback
 
-import psycopg2
-
 from optparse import OptionParser
 from optparse import make_option
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db import reset_queries, close_connection, _rollback_on_exception
+from django.db import reset_queries, close_connection
+from django.db import _rollback_on_exception, connection, transaction
 
-#
-# Assumes a table exists with the following schema:
-#
-# CREATE TABLE "schema_version" (
-#   "id" serial NOT NULL PRIMARY KEY,
-#    "upgrade_timestamp" timestamp with time zone,
-#    "new_version" varchar(20) NOT NULL,
-#    "comment" varchar(200) NULL
-# )
+from siphon.migration.models import *
+
 #
 #
 # Drew's superficial reviews of other upgrade tools:
@@ -72,45 +64,29 @@ def load_module(code_path):
         traceback.print_exc(file = sys.stderr)
         raise
 
-__VERSION_TABLE_NAME__ = "schema_version"
-
 class Upgrader:
    
     def __init__(self, dir, new_version, new_comment, quiet=False):
         self.dir = dir
         self.new_version = new_version
         self.new_comment = new_comment
+        if not self.new_comment:
+            self.new_comment = ''
         self.upgrades_to_run = []
         self.quiet = quiet
+
         db = settings.DATABASES['default']
-        self.connection = psycopg2.connect("dbname=%s user=%s" %\
-                                           (db['NAME'], db['USER']))
-        cursor = self.connection.cursor()
-
-        has_version_table = False
-        
-        cursor.execute("SELECT tablename FROM pg_catalog.pg_tables")
-
-        for row in cursor.fetchall():
-            if cmp(row[0], __VERSION_TABLE_NAME__) == 0:
-                has_version_table = True
-                break;
-        
-        if not has_version_table:
-            print "No version table found"
-            raise Exception("No version table found.")
 
         self.latest_version = 0
         self.latest_date = None
         self.latest_comment = 'Initial version.'
 
-        query = "SELECT new_version, upgrade_timestamp, comment FROM " +\
-                __VERSION_TABLE_NAME__ + " ORDER BY new_version DESC"
-        cursor.execute(query)
-        row = cursor.fetchone()
-        if row:
-            (latest_version_str, self.latest_date, self.latest_comment) = row
-            self.latest_version = int(latest_version_str)
+        schema_migrations = SchemaMigration.objects.order_by('-new_version')
+        print 'Found %s upgrades. ' % len(schema_migrations)
+        if schema_migrations:
+            self.latest_version = schema_migrations[0].new_version
+            self.latest_date = schema_migrations[0].timestamp
+            self.latest_comment = schema_migrations[0].comment
 
         print "Latest version in db: " + str(self.latest_version)
 
@@ -158,26 +134,20 @@ class Upgrader:
                         print "---"
                         print "Executing: " + sql_str
                     try:
-                        cursor = self.connection.cursor()
+                        cursor = connection.cursor()
                         cursor.execute(sql_str)
-                    except:
+                        transaction.commit_unless_managed()
+                    except Exception as e:
                         print "EXCEPTION WHILE EXCUTING SQL:"
                         print sql_str
+                        print 'Exception: %s' % str(e)
                         print "Attempting rollback..."
-                        self.connection.rollback()
+                        transaction.rollback()
                         print "Rollback succeeded"
-                        raise Exception("Exception while executing SQL.")
+                        raise e
 
-                try:
-                    # inc schema_version and commit after each file
-                    self.__log_upgrade(str(upgrade_tuple[0]))  
-                    self.connection.commit()
-                except:
-                    print "EXCEPTION IN VERSION UPDATE/COMMIT"
-                    print "Attempting rollback..."
-                    self.connection.rollback()
-                    print "Rollback succeeded"
-                    raise
+                # inc schema_version after each file
+                self.__log_upgrade(str(upgrade_tuple[0]))
 
                 if not self.quiet:
                     print "Success."
@@ -198,25 +168,14 @@ class Upgrader:
                 finally:
                     close_connection()
 
-                try:
-                    self.__log_upgrade(str(upgrade_tuple[0]))
-                    self.connection.commit()
-                except:
-                    print "EXCEPTION IN VERSION UPDATE/COMMIT"
-                    print "Attempting rollback..."
-                    self.connection.rollback()
-                    print "Rollback succeeded"
-                    raise
-                 
+                self.__log_upgrade(str(upgrade_tuple[0]))
+                                 
         print "Successfully upgraded to version %s." % self.new_version
         
     def __log_upgrade(self, new_version):
-        sql_str = "INSERT INTO %s (upgrade_timestamp, new_version, comment) " %\
-                  __VERSION_TABLE_NAME__ +\
-                  "VALUES ((SELECT NOW()), '%s', '%s')" % (new_version, self.new_comment)
-        print 'sql: ' + str(sql_str)
-        self.connection.cursor().execute(sql_str)
-        
+        new_migration = SchemaMigration.objects.create(new_version=new_version,\
+                                                       comment=self.new_comment)
+        new_migration.save()
             
 class Command(BaseCommand):
     
@@ -234,9 +193,10 @@ class Command(BaseCommand):
         
         print "Starting..."
         
+        default_dir_path = './migration/db'
         if not options['directory']:
-            if os.path.exists('./db'):
-                options['directory'] = './db'
+            if os.path.exists(default_dir_path):
+                options['directory'] = default_dir_path
             else:
                 print "No directory (-d) specified.  Run with -h for usage."
                 sys.exit(1)
@@ -266,7 +226,7 @@ class Command(BaseCommand):
         if options['quiet']:
             quiet = True
         
-        print "SETTINGS: " + os.environ['DJANGO_SETTINGS_MODULE']
+        print "DJANGO SETTINGS: " + os.environ['DJANGO_SETTINGS_MODULE']
         
         upgrader = Upgrader(options['directory'], options['version'], options['comment'], quiet)
         

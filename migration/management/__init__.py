@@ -4,8 +4,8 @@ from django.db.models.signals import post_syncdb
 
 # TODO - set app name more cleanly; in settings variable ??
 
-import siphon
-from siphon.migration.models import *
+import PROJECT_NAME
+from PROJECT_NAME.migration.models import *
  
 def migration_syncdb(sender, **kwargs):
 
@@ -38,4 +38,4 @@ def migration_syncdb(sender, **kwargs):
                                    comment = 'Set automatically during syncdb')
     print 'Schema migration set to latest version: %s' % latest_version
 
-post_syncdb.connect(migration_syncdb, sender=siphon.migration.models)
+post_syncdb.connect(migration_syncdb, sender=PROJECT_NAME.migration.models)

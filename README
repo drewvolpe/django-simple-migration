@@ -32,4 +32,8 @@ If you want to use the admin app to view the migrations that
 have been run on your project, uncomment the admin.py and
 replace PROJECT_NAME with your project's name.
 
+Similarly, to use syncdb functionality, replace PROJECT_NAME in
+migration/management/__init__.py
+
+
 

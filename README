@@ -7,8 +7,8 @@ upgrade and then would run them as needed, keeping track of what
 version it was currently on.  So I wrote it.  This does exactly that
 and nothing else.
 
-It's still very much a work in progress, but is functional and
-actively used for at least two production sites.
+It's still a work in progress, but is functional and actively used
+for at least two production sites.
 
 
 To install:
@@ -22,11 +22,12 @@ To install:
 
 -run "python manage.py upgrade -n 1 -e" to perform the upgrade.
 
-
 That's it.  For future migrations, create 2.sql, 3.sql, etc.
 You can also have migrations which are python files; simply
 create 2.py, 3.py, etc.
 
+
+Admin App and syncdb configuration
 
 If you want to use the admin app to view the migrations that
 have been run on your project, uncomment the admin.py and
@@ -34,6 +35,14 @@ replace PROJECT_NAME with your project's name.
 
 Similarly, to use syncdb functionality, replace PROJECT_NAME in
 migration/management/__init__.py
+
+This will enable a post syncdb signal so that any time syncdb
+is run, the schema will be setup by running all of the upgrades
+in /migration/db/ in order.  This is useful for dev checkouts, etc.
+
+
+Questions, thoughts, stones:
+@drewvolpe or dv@dewdrops.net
 
 
 

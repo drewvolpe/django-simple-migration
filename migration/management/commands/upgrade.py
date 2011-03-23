@@ -106,72 +106,71 @@ class Upgrader:
                 self.upgrades_to_run.append((version_num, py_file)) 
                 continue
 
-
+    @transaction.commit_manually
     def execute(self):
         if len(self.upgrades_to_run) < 1:
             print "No upgrades to perform."
             return
             
         reg = re.compile('\;\W*\n')
-        for upgrade_tuple in self.upgrades_to_run:
-            print "About to run file: " + upgrade_tuple[1]
-            if upgrade_tuple[1].endswith('.sql'):
-                f = open(upgrade_tuple[1], 'r')
-                file_str = f.read()
+        try:
+            for upgrade_tuple in self.upgrades_to_run:
+                print "About to run file: " + upgrade_tuple[1]
+                if upgrade_tuple[1].endswith('.sql'):
+                    f = open(upgrade_tuple[1], 'r')
+                    file_str = f.read()
 
-                # strip the utf8 bom
-                if file_str.startswith(codecs.BOM_UTF8):
-                    file_str = file_str.lstrip(codecs.BOM_UTF8)
-                
-                sql_strs = reg.split(file_str)
-                count = 0
-                for sql_str in sql_strs:
-                    sql_str = sql_str.strip()
-                    if len(sql_str) < 1:
-                        continue
-                    
-                    if not self.quiet:
-                        print "---"
-                        print "Executing: " + sql_str
-                    try:
+                    # strip the utf8 bom
+                    if file_str.startswith(codecs.BOM_UTF8):
+                        file_str = file_str.lstrip(codecs.BOM_UTF8)
+
+                    sql_strs = reg.split(file_str)
+                    count = 0
+                    for sql_str in sql_strs:
+                        sql_str = sql_str.strip()
+                        if len(sql_str) < 1:
+                            continue
+
+                        if not self.quiet:
+                            print "---"
+                            print "Executing: " + sql_str
                         cursor = connection.cursor()
                         cursor.execute(sql_str)
-                        transaction.commit_unless_managed()
-                    except Exception as e:
-                        print "EXCEPTION WHILE EXCUTING SQL:"
-                        print sql_str
-                        print 'Exception: %s' % str(e)
-                        print "Attempting rollback..."
-                        transaction.rollback()
-                        print "Rollback succeeded"
-                        raise e
 
-                # inc schema_version after each file
-                self.__log_upgrade(str(upgrade_tuple[0]))
+                    # inc schema_version after each file
+                    self.__log_upgrade(str(upgrade_tuple[0]))
 
-                if not self.quiet:
-                    print "Success."
-                    print "---"
+                    if not self.quiet:
+                        print "Success."
+                        print "---"
 
-            elif upgrade_tuple[1].endswith('.py'):
-                m = load_module(upgrade_tuple[1])
-                try:
+                elif upgrade_tuple[1].endswith('.py'):
+                    m = load_module(upgrade_tuple[1])
                     try:
-                        reset_queries()
-                        m.run_upgrade()
-                    except:
-                        print "EXCEPTION IN VERSION UPDATE/COMMIT"
-                        print "Attempting rollback..."
-                        _rollback_on_exception()
-                        print "Rollback succeeded"
-                        raise
-                finally:
-                    close_connection()
+                        try:
+                            reset_queries()
+                            m.run_upgrade()
+                        except:
+                            print "EXCEPTION IN VERSION UPDATE/COMMIT"
+                            print "Attempting rollback..."
+                            _rollback_on_exception()
+                            print "Rollback succeeded"
+                            raise
+                    finally:
+                        close_connection()
 
-                self.__log_upgrade(str(upgrade_tuple[0]))
-                                 
-        print "Successfully upgraded to version %s." % self.new_version
-        
+                    self.__log_upgrade(str(upgrade_tuple[0]))
+                    
+        except Exception as e:
+            print 'EXCEPTION WHILE EXCUTING SQL: "%s" ' % sql_str
+            print 'Exception: %s' % str(e)
+            print "Attempting rollback..."
+            transaction.rollback()
+            print "Rollback succeeded"
+        else:
+            transaction.commit()
+            print "Successfully upgraded to version %s." % self.new_version
+                
     def __log_upgrade(self, new_version):
         new_migration = SchemaMigration.objects.create(new_version=new_version,\
                                                        comment=self.new_comment)
@@ -257,5 +256,5 @@ class Command(BaseCommand):
             traceback.print_exc(file = sys.stderr)
             sys.exit(1)
                 
-        print "Finished."
+        print "done."
         sys.exit(0)

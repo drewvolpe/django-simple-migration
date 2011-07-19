@@ -20,6 +20,7 @@ def migration_syncdb(sender, **kwargs):
            os.path.exists(file_path + '.py'):
             latest_version += 1
             continue
+        latest_version -= 1
         break
 
     if schema_migrations:

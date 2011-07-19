@@ -64,6 +64,34 @@ def load_module(code_path):
         traceback.print_exc(file = sys.stderr)
         raise
 
+def run_migration(upgrade_filepath, quiet=True):
+    """ takes in path to .sql or .py and runs it """
+    if upgrade_filepath.endswith('.sql'):
+        f = open(upgrade_filepath, 'r')
+        file_str = f.read()
+
+        # strip the utf8 bom
+        if file_str.startswith(codecs.BOM_UTF8):
+            file_str = file_str.lstrip(codecs.BOM_UTF8)
+
+        reg = re.compile('\;\W*\n')
+        sql_strs = reg.split(file_str)
+        count = 0
+        for sql_str in sql_strs:
+            sql_str = sql_str.strip()
+            if len(sql_str) < 1:
+                continue
+
+            if not quiet:
+                print "---"
+                print "Executing: " + sql_str
+                cursor = connection.cursor()
+                cursor.execute(sql_str)
+
+    elif upgrade_filepath.endswith('.py'):
+        m = load_module(upgrade_tuple[1])
+        m.run_migration()
+
 class Upgrader:
    
     def __init__(self, dir, new_version, new_comment, quiet=False):
@@ -110,60 +138,21 @@ class Upgrader:
     def execute(self):
         if len(self.upgrades_to_run) < 1:
             print "No upgrades to perform."
-            return
-            
-        reg = re.compile('\;\W*\n')
+            return          
+
         try:
             for upgrade_tuple in self.upgrades_to_run:
                 print "About to run file: " + upgrade_tuple[1]
-                if upgrade_tuple[1].endswith('.sql'):
-                    f = open(upgrade_tuple[1], 'r')
-                    file_str = f.read()
+                run_migration(upgrade_tuple[1], self.quiet)
+                if not self.quiet:
+                    print "Success."
+                    print "---"
 
-                    # strip the utf8 bom
-                    if file_str.startswith(codecs.BOM_UTF8):
-                        file_str = file_str.lstrip(codecs.BOM_UTF8)
-
-                    sql_strs = reg.split(file_str)
-                    count = 0
-                    for sql_str in sql_strs:
-                        sql_str = sql_str.strip()
-                        if len(sql_str) < 1:
-                            continue
-
-                        if not self.quiet:
-                            print "---"
-                            print "Executing: " + sql_str
-                        cursor = connection.cursor()
-                        cursor.execute(sql_str)
-
-                    # inc schema_version after each file
-                    self.__log_upgrade(str(upgrade_tuple[0]))
-
-                    if not self.quiet:
-                        print "Success."
-                        print "---"
-
-                elif upgrade_tuple[1].endswith('.py'):
-                    m = load_module(upgrade_tuple[1])
-                    try:
-                        try:
-                            reset_queries()
-                            m.run_upgrade()
-                        except:
-                            print "EXCEPTION IN VERSION UPDATE/COMMIT"
-                            print "Attempting rollback..."
-                            _rollback_on_exception()
-                            print "Rollback succeeded"
-                            raise
-                    finally:
-                        close_connection()
-
-                    self.__log_upgrade(str(upgrade_tuple[0]))
+                # inc schema_version after each file
+                self.__log_upgrade(str(upgrade_tuple[0]))
                     
         except Exception as e:
-            print 'EXCEPTION WHILE EXCUTING SQL: "%s" ' % sql_str
-            print 'Exception: %s' % str(e)
+            print '!!!! Exception: %s' % str(e)
             print "Attempting rollback..."
             transaction.rollback()
             print "Rollback succeeded"
@@ -257,4 +246,3 @@ class Command(BaseCommand):
             sys.exit(1)
                 
         print "done."
-        sys.exit(0)

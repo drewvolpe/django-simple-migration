@@ -26,6 +26,14 @@ That's it.  For future migrations, create 2.sql, 3.sql, etc.
 You can also have migrations which are python files; simply
 create 2.py, 3.py, etc.
 
+-To go back, you can run "python manage.py downgrade" to
+perform a downgrade.
+
+This assumes that you've created d_2.sql, d_3.sql, etc. which
+does the appropriate actions to undo the migration.  It is 
+recommended (but not required) to write a downgrade for each 
+upgrade.
+
 
 Admin App and syncdb configuration
 

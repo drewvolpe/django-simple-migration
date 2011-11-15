@@ -53,7 +53,7 @@ def load_module(code_path):
 
             fin = open(code_path, 'rb')
 
-            return imp.load_source(hashlib.new(code_path).hexdigest(), code_path, fin)
+            return imp.load_source(hashlib.sha256(code_path).hexdigest(), code_path, fin)
         finally: 
             try: fin.close()
             except: pass
@@ -74,6 +74,10 @@ def run_migration(upgrade_filepath, quiet=True):
         if file_str.startswith(codecs.BOM_UTF8):
             file_str = file_str.lstrip(codecs.BOM_UTF8)
 
+        # TODO mpk 10/11/11: I think there's two issues with this regex: 1) handling commented out
+        # SQL statements (i.e., if there's a ; inside of a SQL comment, the upgrader chokes on it,
+        # thinking it needs to execute an empty command; 2) handling $$-quoted strings (like PL/SQL
+        # functions)
         reg = re.compile('\;\W*\n')
         sql_strs = reg.split(file_str)
         count = 0
@@ -89,7 +93,7 @@ def run_migration(upgrade_filepath, quiet=True):
                 cursor.execute(sql_str)
 
     elif upgrade_filepath.endswith('.py'):
-        m = load_module(upgrade_tuple[1])
+        m = load_module(upgrade_filepath)
         m.run_migration()
 
 class Upgrader:
@@ -221,7 +225,7 @@ class Command(BaseCommand):
         print "Current app version %s, upgraded on %s" %\
               (str(upgrader.latest_version), str(upgrader.latest_date)) 
         print "Last comment: %s" % upgrader.latest_comment
-        print "SQL to-be-run:"
+        print "Script(s) to-be-run:"
         for upgrade_tuple in upgrader.upgrades_to_run:
             print "---"
             print str(upgrade_tuple[0]) + " - " + upgrade_tuple[1]

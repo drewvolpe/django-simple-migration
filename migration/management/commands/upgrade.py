@@ -120,6 +120,9 @@ class Upgrader:
             self.latest_date = schema_migrations[0].timestamp
             self.latest_comment = schema_migrations[0].comment
 
+        if not self.new_version:
+            return
+
         print "Latest version in db: " + str(self.latest_version)
 
         # find .sql or .py files which need to be run

@@ -198,8 +198,18 @@ class Command(BaseCommand):
         if not os.path.exists(options['directory']):
             print "Directory %s does not exist." % options['directory']
             sys.exit(1)
+
+        quiet = False
+        if options['quiet']:
+            quiet = True
+
+        print "DJANGO SETTINGS: " + os.environ.get('DJANGO_SETTINGS_MODULE')
+        upgrader = Upgrader(options['directory'], options['version'], options['comment'], quiet)
+        print "Current version in the db: %s\nUpgraded on %s" %\
+              (str(upgrader.latest_version), str(upgrader.latest_date)) 
+        print "Last comment: %s" % upgrader.latest_comment
+
         if not options['version']:
-            print "No version (-n) specified. Run with -h for usage."
             biggest_version = 0;
             for file in os.listdir(options['directory']):
                 end_index = string.rfind(file, '.sql')
@@ -212,22 +222,17 @@ class Command(BaseCommand):
                             biggest_version = version
                     except:
                         i=43 # keep parser happy
-            print 'Biggest version of upgrades in %s seems to be: %s' %\
-                  (options['directory'], str(biggest_version))               
+            if upgrader and upgrader.latest_version and biggest_version <= upgrader.latest_version:
+                print 'DB is up-to-date (version %s). No upgrade needed' % biggest_version
+                sys.exit(0)
+            print "No version (-n) specified."
+            db_ver = upgrader.latest_version if upgrader.latest_version else -1
+            print 'DB is on %s and %s has %s.' % (db_ver, options['directory'], biggest_version)
+            print 'Need to run: -n %s -e' % biggest_version
             sys.exit(1)
         if not options['comment']:
             comment = ''
-        quiet = False
-        if options['quiet']:
-            quiet = True
-        
-        print "DJANGO SETTINGS: " + os.environ['DJANGO_SETTINGS_MODULE']
-        
-        upgrader = Upgrader(options['directory'], options['version'], options['comment'], quiet)
-        
-        print "Current app version %s, upgraded on %s" %\
-              (str(upgrader.latest_version), str(upgrader.latest_date)) 
-        print "Last comment: %s" % upgrader.latest_comment
+
         print "Script(s) to-be-run:"
         for upgrade_tuple in upgrader.upgrades_to_run:
             print "---"

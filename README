@@ -15,7 +15,7 @@ To install:
 
 -copy the "management" folder into your django project.
 
--add 'project.migration' to the INSTALLED_APPS in your settings.py
+-add '<project name>.migration' to the INSTALLED_APPS in your settings.py
 
 -create a 1.sql with your first migration in it.
  (there's an example one in there which creates a new table)

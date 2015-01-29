@@ -17,7 +17,6 @@ from django.core.management.base import BaseCommand
 from django.db import reset_queries, close_connection
 from django.db import _rollback_on_exception, connection, transaction
 
-from siphon.migration.models import *
 
 #
 #
